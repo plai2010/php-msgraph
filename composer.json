@@ -1,11 +1,12 @@
 {
-    "name": "plai2010/msgraph-mgr",
-    "description": "MS Graph API manager.",
+    "name": "plai2010/php-msgraph",
+    "description": "Microsoft Graph utilities for PHP.",
     "type": "library",
     "license": "MIT",
     "authors": [
         {
-            "name": "Patrick Lai"
+            "name": "Patrick Lai",
+            "email": "2010.plai@gmail.com"
         }
     ],
     "autoload": {
