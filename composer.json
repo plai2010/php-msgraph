@@ -1,0 +1,30 @@
+{
+    "name": "plai2010/msgraph-mgr",
+    "description": "MS Graph API manager.",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Patrick Lai"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "PL2010\\Laravel\\": "src/Laravel/",
+            "PL2010\\MsGraph\\": "src/"
+        }
+    },
+    "require": {
+        "microsoft/microsoft-graph": "^1.102",
+        "plai2010/php-oauth2": "^1.0",
+        "symfony/mailer": "^6.2"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "PL2010\\Laravel\\MsGraphServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable"
+}
