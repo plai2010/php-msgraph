@@ -215,9 +215,7 @@ trait MsGraphMessageBuilder {
 				$text = $this->parseAlternativeForText($first);
 			}
 			// The remaining parts are presumed to be attachments.
-			while ($part = next($parts)) {
-				$attachments[] = $this->msGraphAttachment($part);
-			}
+			$attachments = array_slice($parts, 1);
 			break;
 		default:
 			break;
