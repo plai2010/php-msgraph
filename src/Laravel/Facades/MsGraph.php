@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * Facade for MS Graph API invocation.
- * @method static void sendEmail(\Symfony\Component\Mime\Message $msg, bool $save=false);
+ * @method static void sendEmail(\Symfony\Component\Mime\Email $email, bool $save=false);
  */
 class MsGraph extends Facade {
 	/**

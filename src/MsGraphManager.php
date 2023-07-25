@@ -4,7 +4,7 @@ namespace PL2010\MsGraph;
 use PL2010\MsGraph\MsGraphClient;
 use PL2010\MsGraph\Contracts\MsGraphDispatch;
 
-use Symfony\Component\Mime\Message;
+use Symfony\Component\Mime\Email;
 
 /**
  * Manager of MS Graph API clients.
@@ -57,7 +57,10 @@ class MsGraphManager implements MsGraphDispatch {
 		return $impl;
 	}
 
-	public function sendEmail(Message $msg, bool $save=false): void {
-		$this->get()->sendEmail($msg, $save);
+	/**
+	 * {@inerhitdoc}
+	 */
+	public function sendEmail(Email $email, bool $save=false): void {
+		$this->get()->sendEmail($email, $save);
 	}
 }

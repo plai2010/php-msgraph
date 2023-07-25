@@ -1,27 +1,22 @@
 <?php
 namespace PL2010\MsGraph;
 
+use PL2010\MsGraph\Concerns\MsGraphMessageBuilder;
 use PL2010\MsGraph\Contracts\MsGraphDispatch;
 use PL2010\OAuth2\Contracts\TokenRepository;
 
 use Microsoft\Graph\Graph;
 use Microsoft\Graph\Exception\GraphException;
 use Microsoft\Graph\Http\GraphRequest;
-use Symfony\Component\Mime\Message;
-use Symfony\Component\Mime\Header\DateHeader;
-use Symfony\Component\Mime\Header\HeaderInterface;
-use Symfony\Component\Mime\Header\MailboxHeader;
-use Symfony\Component\Mime\Header\MailboxListHeader;
-
+use Symfony\Component\Mime\Email;
 use Closure;
-use DateTime;
-use DateTimeInterface;
-use DateTimeZone;
 
 /**
  * Implementation of the {@link MsGraphDispatch} interface.
  */
 class MsGraphClient implements MsGraphDispatch {
+	use MsGraphMessageBuilder;
+
 	/** @var TokenRepository|Closure Token repository or resolver. */
 	protected TokenRepository|Closure $tk_repo;
 
@@ -45,55 +40,6 @@ class MsGraphClient implements MsGraphDispatch {
 			'token_key' => $this->name,
 			'token_ttl' => 120,
 		], $this->config);
-	}
-
-	/**
-	 * Format date/time to Microsoft Graph API DateTimeOffset.
-	 * @param DateTimeInterface $dt
-	 * @return string UTC time string e.g. '2014-01-01T00:00:00Z'.
-	 */
-	private function formatDateTimeOffset(DateTimeInterface $dt): string {
-		$utc = new DateTime('now', new DateTimeZone('UTC'));
-		$utc->setTimestamp($dt->getTimestamp());
-		return $utc->format('Y-m-d\\TH:i:sp');
-	}
-
-	/**
-	 * Format message email header for MS Graph sendMail.
-	 * @param Symfony\Component\Mime\Header\HeaderInterface $header
-	 * @param bool $first Return only first address.
-	 * @return array List of email addresses, or just the first one if $first.
-	 */
-	private function formatEmailAddresses(
-		HeaderInterface $header,
-		bool $first=false
-	): array {
-		// Extract adddresses from mailbox.
-		$mboxAddresses = null;
-		if ($header instanceof MailboxHeader) {
-			$mboxAddresses[] = $header->getAddress();
-		}
-		else if ($header instanceof MailboxListHeader) {
-			$mboxAddresses = $header->getAddresses();
-		}
-
-		$result = [];
-		if ($mboxAddresses) {
-			// Mailbox header addresses.
-			foreach ($mboxAddresses as $address) {
-				$result[] = [
-					'emailAddress' => [
-						'name' => $address->getName(),
-						'address' => $address->getAddress(),
-					],
-				];
-				if ($first) {
-					$result = $result[0];
-					break;
-				}
-			}
-		}
-		return $result;
 	}
 
 	/**
@@ -148,53 +94,15 @@ class MsGraphClient implements MsGraphDispatch {
 
 	/**
 	 * {@inheritdoc}
-	 * No support yet for multi-part messages.
 	 */
-	public function sendEmail(Message $msg, bool $save=false): void {
-		$email = [];
-
-		$body = $msg->getBody();
-		$email['body'] = [
-			'contentType' => strtolower($body->getMediaSubtype())==='html'
-				? 'html'
-				: 'text',
-			'content' => $body->bodyToString(),
-		];
-
-		foreach ($msg->getHeaders()->all() as $header) {
-			switch ($name = strtolower($header->getName())) {
-			case 'date':
-				assert($header instanceof DateHeader);
-				$email['createdDateTime'] = $this->formatDateTimeOffset(
-					$header->getDateTime()
-				);
-				break;
-			case 'from':
-			case 'sender':
-				$email['from'] = $this->formatEmailAddresses($header, true);
-				break;
-			case 'bcc':
-			case 'cc':
-			case 'to':
-				$email["{$name}Recipients"] =
-					$this->formatEmailAddresses($header);
-				break;
-			case 'reply-to':
-				$email['replyTo'] = $this->formatEmailAddresses($header);
-				break;
-			case 'subject':
-				$email['subject'] = $header->getBodyAsString();
-				break;
-			default:
-				break;
-			}
-		}
+	public function sendEmail(Email $email, bool $save=false): void {
+		$message = $this->msGraphMessage($email);
 
 		$response = $this->prepareRequest(
 			'POST',
 			'/me/sendMail'
 		)->attachBody([
-			'message' => $email,
+			'message' => $message,
 			'saveToSentItems' => $save,
 		])->execute();
 
