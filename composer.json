@@ -17,7 +17,7 @@
     },
     "require": {
         "microsoft/microsoft-graph": "^1.102",
-        "plai2010/php-oauth2": "^1.0",
+        "plai2010/php-oauth2": "^1.0.1",
         "symfony/mailer": "^6.2"
     },
     "extra": {

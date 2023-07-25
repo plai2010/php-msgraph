@@ -39,6 +39,7 @@ class MsGraphClient implements MsGraphDispatch {
 		$this->config = array_merge([
 			'token_key' => $this->name,
 			'token_ttl' => 120,
+			'text_subtype' => 'html',
 		], $this->config);
 	}
 
@@ -96,7 +97,7 @@ class MsGraphClient implements MsGraphDispatch {
 	 * {@inheritdoc}
 	 */
 	public function sendEmail(Email $email, bool $save=false): void {
-		$message = $this->msGraphMessage($email);
+		$message = $this->msGraphMessage($email, $this->config['text_subtype']);
 
 		$response = $this->prepareRequest(
 			'POST',

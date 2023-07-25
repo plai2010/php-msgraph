@@ -4,8 +4,10 @@ namespace PL2010\MsGraph\Concerns;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
 use Symfony\Component\Mime\Part\AbstractPart;
+use Symfony\Component\Mime\Part\AbstractMultipartPart;
 use Symfony\Component\Mime\Part\DataPart;
 use Symfony\Component\Mime\Part\TextPart;
+use Symfony\Component\Mime\Part\Multipart\AlternativePart;
 
 use DateTime;
 use DateTimeImmutable;
@@ -75,9 +77,13 @@ trait MsGraphMessageBuilder {
 	/**
 	 * Build a MS Graph Message from Symfony MIME email.
 	 * @param \Symfony\Component\Mime\Email $email
+	 * @param string $textType Preferred text subtype among alternatives.
 	 * @return array
 	 */
-	private function msGraphMessage(Email $email): array {
+	private function msGraphMessage(
+		Email $email,
+		string $textType='html'
+	): array {
 		$message = [];
 
 		$body = $email->getBody();
@@ -86,16 +92,13 @@ trait MsGraphMessageBuilder {
 			$message['body'] = $this->msGraphItemBody($body);
 			break;
 		case 'multipart':
-			$text = null;
-			foreach ($body->getParts() as $part) {
-				if (!$text && $part instanceof TextPart) {
-					// First text part is main body.
-					$text = $part;
-					$message['body'] = $this->msGraphItemBody($part);
-				}
-				else {
-					$message['attachments'][] = $this->msGraphAttachment($part);
-				}
+			[
+				$text,
+				$attachments,
+			] = $this->parseMultipart($body, $textType);
+			$message['body'] = $this->msGraphItemBody($text);
+			foreach ($attachments as $part) {
+				$message['attachments'][] = $this->msGraphAttachment($part);
 			}
 			break;
 		default:
@@ -146,6 +149,88 @@ trait MsGraphMessageBuilder {
 				'name' => $addr->getName(),
 				'address' => $addr->getAddress(),
 			],
+		];
+	}
+
+	/**
+	 * Parse an alternative multi-part for the main text.
+	 * @param \Symfony\Component\Mime\Part\Multipart\AlternativePart $multi
+	 * @param string $textType Preferred subtype if not the first.
+	 */
+	private function parseAlternativeForText(
+		AlternativePart $multi,
+		string $textType=''
+	): ?TextPart {
+		$subtype = strtolower($textType);
+
+		$first = null;
+		$text = null;
+		foreach ($multi->getParts() as $text) {
+			// Non-text is unexpected, but let's continue.
+			if (!$text instanceof TextPart)
+				continue;
+			$first ??= $text;
+
+			if ($subtype === ''
+				|| strtolower($text->getMediaSubtype()) === $subtype
+			) {
+				return $text;
+			}
+		}
+		return $first;
+	}
+
+	/**
+	 * Extract main message and attachments from multi-part.
+	 * This expects the multi-part to be one of these forms:
+	 * - alternative: TextPart alernatives
+	 * - mixed: TextPart or AlternativePart followed by DataPart attachments
+	 * @todo Handle related multipart.
+	 * @param \Symfony\Component\Mime\Part\AbstractMultipartPart $multi
+	 * @param string $textType Preferred text subtype among alternatives.
+	 * @return array Tuple of text body and list of attachment parts.
+	 */
+	private function parseMultipart(
+		AbstractMultipartPart $multi,
+		string $textType='html'
+	): array {
+		$text = null;
+		$attachments = [];
+
+		$subtype = $multi->getMediaSubtype();
+		$parts = $multi->getParts();
+		switch ($subtype) {
+		case 'alternative':
+			// Main message in alternative form (html vs text).
+			$text = $this->parseAlternativeForText($multi, $textType);
+			break;
+		case 'mixed':
+			// Main message with attachments.
+			// First is either a text or an alternatives of some.
+			$first = reset($parts);
+			if ($first instanceof TextPart) {
+				$text = $first;
+			}
+			else if ($first instanceof AlternativePart) {
+				$text = $this->parseAlternativeForText($first);
+			}
+			// The remaining parts are presumed to be attachments.
+			while ($part = next($parts)) {
+				$attachments[] = $this->msGraphAttachment($part);
+			}
+			break;
+		default:
+			break;
+		}
+
+		if (!$text) {
+			throw new InvalidArgumentException(
+				"no text part found in multipart/{$subtype}");
+		}
+
+		return [
+			$text,
+			$attachments,
 		];
 	}
 }
