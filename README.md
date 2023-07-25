@@ -4,7 +4,7 @@
 [plai2010-oauth2-client]: https://packagist.org/packages/plai2010/php-oauth2
 
 This is a utility package for using Microsoft Graph API in PHP
-applications. In this version it only supports sending simple email
+applications. In this version it only supports sending email
 messages to the `sendMail` endpoint.
 
 The use case for this package was email notification in a Laravel
@@ -64,7 +64,9 @@ $msg = (new \Symfony\Component\Mime\Email())
 	->from('no-reply@example.com')
 	->to('john.doe@example.com')
 	->subject('hello')
-	->html('<h3>Greetings!</h3>');
+	->html('<h3>Greetings!</h3>')
+	->attach(file_get_contents('wave.png'), 'wave.png', 'image/png')
+;
 $msgraph->sendEmail($msg);
 ```
 

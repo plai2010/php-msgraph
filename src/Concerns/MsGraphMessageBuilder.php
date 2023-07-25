@@ -3,7 +3,9 @@ namespace PL2010\MsGraph\Concerns;
 
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
-use Symfony\Component\Mime\Part\AbstractMultipartPart;
+use Symfony\Component\Mime\Part\AbstractPart;
+use Symfony\Component\Mime\Part\DataPart;
+use Symfony\Component\Mime\Part\TextPart;
 
 use DateTime;
 use DateTimeImmutable;
@@ -16,12 +18,33 @@ use InvalidArgumentException;
 trait MsGraphMessageBuilder {
 	/**
 	 * Build MS Graph Attachment from Symfony MIME multi-part.
-	 * @param \Symfony\Component\Mime\Part\AbstractMultipartPart $multi
+	 * @todo Handle large size attachment (over 3MB).
+	 * @param \Symfony\Component\Mime\Part\AbstractPart $part
 	 * @return array
 	 */
-	private function msGraphAttachments(AbstractMultipartPart $multi): array {
-		// TODO: large size attachment
-		return [];
+	private function msGraphAttachment(AbstractPart $part): array {
+		$data = $part instanceof TextPart
+			? $part->getBody()
+			: $part->bodyToString();
+		$attachment = [
+			'@odata.type' => '#microsoft.graph.fileAttachment',
+			'contentBytes' => base64_encode($data),
+			'contentType' => $part->getMediaType().'/'.$part->getMediaSubtype(),
+			'size' => strlen($data),
+		];
+		if ($part instanceof TextPart) {
+			if (($name = $part->getName()) !== null)
+				$attachment['name'] = $name;
+			if ($part->getDisposition() === 'inline')
+				$attachment['isInline'] = true;
+		}
+		if ($part instanceof DataPart) {
+			if ($part->hasContentId())
+				$attachment['contentId'] = $part->getContentId();
+			if (($filename = $part->getFilename()) !== null)
+				$attachment['name'] = $filename;
+		}
+		return $attachment;
 	}
 
 	/**
@@ -36,6 +59,20 @@ trait MsGraphMessageBuilder {
 	}
 
 	/**
+	 * Build MS Graph ItemBody from Symfony MIME part.
+	 * @param \Symfony\Components\Mime\Part\TextPart $part
+	 * @return array
+	 */
+	private function msGraphItemBody(TextPart $part): array {
+		return [
+			'contentType' => strtolower($part->getMediaSubtype()) === 'html'
+				? 'html'
+				: 'text',
+			'content' => $part->getBody(),
+		];
+	}
+
+	/**
 	 * Build a MS Graph Message from Symfony MIME email.
 	 * @param \Symfony\Component\Mime\Email $email
 	 * @return array
@@ -46,15 +83,20 @@ trait MsGraphMessageBuilder {
 		$body = $email->getBody();
 		switch ($type = $body->getMediaType()) {
 		case 'text':
-			$message['body'] = [
-				'contentType' => strtolower($body->getMediaSubtype()) === 'html'
-					? 'html'
-					: 'text',
-				'content' => $body->bodyToString(),
-			];
+			$message['body'] = $this->msGraphItemBody($body);
 			break;
 		case 'multipart':
-			$message['attachments'] = $this->msGraphAttachments($body);
+			$text = null;
+			foreach ($body->getParts() as $part) {
+				if (!$text && $part instanceof TextPart) {
+					// First text part is main body.
+					$text = $part;
+					$message['body'] = $this->msGraphItemBody($part);
+				}
+				else {
+					$message['attachments'][] = $this->msGraphAttachment($part);
+				}
+			}
 			break;
 		default:
 			throw new InvalidArgumentException(
