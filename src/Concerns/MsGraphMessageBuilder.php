@@ -212,7 +212,7 @@ trait MsGraphMessageBuilder {
 				$text = $first;
 			}
 			else if ($first instanceof AlternativePart) {
-				$text = $this->parseAlternativeForText($first);
+				$text = $this->parseAlternativeForText($first, $textType);
 			}
 			// The remaining parts are presumed to be attachments.
 			$attachments = array_slice($parts, 1);
